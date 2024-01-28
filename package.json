@@ -1,0 +1,39 @@
+{
+  "name": "backend-case",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Neste teste, vamos avaliar seus conhecimentos gerais e a rapidez no desenvolvimento. Abaixo, explicamos tudo o que você precisa saber para prosseguir. Não se preocupe se parecer desafiador à primeira vista! Não esperamos que todos completem todas as tarefas. Este teste é aplicado a candidatos de todos os níveis de experiência, então faça o melhor que puder sem pressão. O foco é criar uma API RESTful eficiente e segura para um sistema de gerenciamento de documentos jurídicos, demonstrando sua habilidade em organizar e desenvolver um software moderno e robusto.",
+  "main": "src/index.mjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "cross-env NODE_ENV=production && node build.js",
+    "dev": "tsx watch src/index.mjs",
+    "start": "node dist/index.js",
+    "test": "vitest test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "no license",
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "esbuild": "0.19.12",
+    "tsx": "^4.7.0",
+    "vitest": "^1.2.1"
+  },
+  "dependencies": {
+    "@lucia-auth/adapter-mongoose": "^3.0.1",
+    "ansi-styles": "^6.2.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "lucia": "^2.7.6",
+    "mammoth": "^1.6.0",
+    "mongoose": "^8.1.1",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.26.0",
+    "pdfjs-dist": "^4.0.379",
+    "zod": "^3.22.4"
+  }
+}
