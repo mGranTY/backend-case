@@ -10,7 +10,7 @@
   "scripts": {
     "build": "cross-env NODE_ENV=production && node build.js",
     "dev": "tsx watch src/index.mjs",
-    "start": "node dist/index.js",
+    "start": "pm2 start dist/index.js -i max",
     "test": "vitest test"
   },
   "keywords": [],
