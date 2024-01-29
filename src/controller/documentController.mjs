@@ -81,8 +81,14 @@ async function extractKeywords(buffer, mime) {
                 break;
             }
             default: {
+                documentText = "x"
                 break;
             }
+        }
+
+        if(documentText === "x") {
+            Logging.warn(`No support for this file type yet.`)
+            return []
         }
 
         //After getting text data, use OpenAI to extract keywords
@@ -123,7 +129,6 @@ async function extractKeywords(buffer, mime) {
     } catch (error) {
         // Log error and throw it further.
         Logging.error('Error extracting text from PDF:', error);
-        throw error;
     }
 }
 
