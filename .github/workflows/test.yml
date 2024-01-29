@@ -4,7 +4,7 @@ env:
   PORT: 3000
   OPEN_AI_API_KEY: "hi"
   MONGODB_URI: "mongodb://"
-
+  NODE_ENV: "production"
 on:
   push:
     branches:
@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3.5.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
       - name: Install dependencies
         run: npm install
       - name: Build check
