@@ -169,7 +169,7 @@ export function uploadDocument(req, res) {
         // Calls the following functions to handle document processing and db operations
         try {
             const session = await getUserSession(req, res);
-            const file = parseFileSchema(req.file);
+            const file = fileSchema.parse(req.file);
             const fileHash = generateSHA256Hash(file.buffer);
             const document = await saveDocument(file, session.user.userId, fileHash);
 
