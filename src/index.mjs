@@ -4,6 +4,8 @@ import express from 'express';
 import mongoose from "mongoose";
 // Import run-time type checked configuration file.
 import {CONFIG} from "./configs/envConfig.mjs";
+// Import compression middleware
+import compression from "express-compression";
 // Import CORS (Cross-Origin Resource Sharing) middleware.
 import cors from 'cors'
 // Import logger utility.
@@ -16,12 +18,14 @@ import {AuthMiddleware} from "./utils/lucia.mjs";
 import {documentRouter} from "./routes/documentRouter.mjs";
 import {authRouter} from "./routes/authRouter.mjs";
 
+
 // Initialize express app.
 const app = express();
 
 // Use JSON body parser provided natively by Express.
 app.use(express.json())
 app.use(express.urlencoded({extended: true}));
+app.use(compression())
 
 // Configure CORS (Cross-Origin Resource Sharing).
 app.use(cors({
