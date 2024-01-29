@@ -18,11 +18,11 @@
   "author": "",
   "license": "no license",
   "devDependencies": {
-    "esbuild": "0.19.12",
-    "tsx": "^4.7.0",
-    "vitest": "^1.2.2"
+    "tsx": "^4.7.0"
   },
   "dependencies": {
+    "vitest": "^1.2.2",
+    "esbuild": "0.19.12",
     "cross-env": "^7.0.3",
     "@lucia-auth/adapter-mongoose": "^3.0.1",
     "ansi-styles": "^6.2.1",
