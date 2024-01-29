@@ -190,11 +190,6 @@ function handleError(error, res) {
     new Error(error);
 }
 
-// Function to parse the file schema - separates the logic for parsing and validating the file schema
-function parseFileSchema(file) {
-    //attempt to parse the file to check if it matches the schema
-    return fileSchema.safeParse(file);
-}
 
 // Function to Save the document in DB
 async function saveDocument(file, userId, fileHash) {
