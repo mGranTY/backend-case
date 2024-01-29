@@ -1,17 +1,20 @@
-import {auth} from "../utils/lucia.mjs";
-import Logging from "../utils/logger.mjs";
-import {z} from "zod";
-import {LuciaError} from "lucia";
+// Imports the necessary modules
+import {auth} from "../utils/lucia.mjs"; // Import authentication module
+import Logging from "../utils/logger.mjs"; // Import logging module
+import {z} from "zod"; // Import zod for schema validation
 
+// Schemas for account creation and login
 const AccountSchema = z.object({
     email: z.string().email(),
     password: z.string().min(6).max(32),
 });
 
-export function createAccount(req, res){
+// Function for creating a new account
+export async function createAccount(req, res){
     try {
-        const { email, password } = AccountSchema.parse(req.body)
-        const user = auth.createUser({
+        const { email, password } = AccountSchema.parse(req.body); // Validate and parse request body
+        // Try to create the user, await for the function to complete
+        await auth.createUser({
             key: {
                 providerId: "email",
                 providerUserId: `${email}`,
@@ -20,32 +23,34 @@ export function createAccount(req, res){
             attributes: {
                 username: `${email}`
             }
-        }).then(r => {
-            res.status(200).json({message: "Account created!", success: true});
-        }).catch(e => res.status(500).json({message: e.message, success: false}));
+        });
+
+        res.status(200).json({message: "Account created!", success: true});
     } catch (e) {
-        Logging.error(e)
-        res.status(500).json({message: e, success: false});
+        Logging.error(e); // Log the error
+        res.status(500).json({message: e.message, success: false});
     }
 }
 
-export function login(req, res){
+// Function for logging in
+export async function login(req, res){
     try {
-        const { email, password } = AccountSchema.parse(req.body)
-        auth.useKey("email", email, password).then(key => {
-            if(key){
-                auth.getUser(key.userId).then(user => {
-                    auth.createSession({
-                        userId: user.userId,
-                        attributes: {}
-                    }).then(session => {
-                        res.status(200).json({session: session.sessionId, success: true});
-                    }).catch(e => res.status(500).json({message: e.message, success: false}));
-                }).catch(e => res.status(500).json({message: e.message, success: false}));
-            }
-        }).catch(e => res.status(500).json({message: e.message, success: false}));
+        const { email, password } = AccountSchema.parse(req.body) // Validate and parse request body
+        const key = await auth.useKey("email", email, password);
+
+        if (!key) {
+            throw new Error('Invalid credentials');
+        }
+
+        const user = await auth.getUser(key.userId);
+        const session = await auth.createSession({
+            userId: user.userId,
+            attributes: {}
+        });
+
+        res.status(200).json({session: session.sessionId, success: true});
     } catch (e) {
-        Logging.error(e)
-        res.status(500).json({message: e, success: false});
+        Logging.error(e); // Log the error
+        res.status(500).json({message: e.message, success: false});
     }
 }

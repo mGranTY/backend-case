@@ -8,64 +8,75 @@ import {dirname, join} from "path"
 import OpenAI from "openai";
 import {CONFIG} from "../configs/envConfig.mjs";
 import mammoth from "mammoth";
-import {auth, getUserSession} from "../utils/lucia.mjs";
+import {getUserSession} from "../utils/lucia.mjs";
 import Logging from "../utils/logger.mjs";
 
 
+// The `import.meta.url` gives the URL representation of the current module
+// The `fileURLToPath()` method is used to convert this URL into the absolute path of the module
 const __filename = fileURLToPath(import.meta.url);
+// The `dirname()` function from the 'path' module to extract the directory name of the `__filename`
+// The path to the current directory in the file system that the current module resides in
 const __dirname = dirname(__filename);
-const standardFontsPath = join(__dirname, '../../node_modules/pdfjs-dist/standard_fonts/');
+let standardFontsPath;
+
+if (CONFIG.NODE_ENV === 'production') {
+    // In production/bundled environment, the fonts are in the bundled 'dist' directory
+    standardFontsPath = join(__dirname, './standard_fonts/');
+} else {
+    // In development, the fonts are in 'public/assets'
+    standardFontsPath = join(__dirname, '../../public/assets/standard_fonts/');
+}
 
 const storage = multer.memoryStorage(); // Armazenar em memória para verificar integridade
-
-function removeAccents(str) {
-    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
 
 const openai = new OpenAI({
     apiKey: CONFIG.OPEN_AI_API_KEY,
 });
 
+/**
+ * This function is responsible for extract keywords from a document using the OpenAI API.
+ * It supports documents of the type PDF and DOCX.
+ *
+ * @param {Buffer} buffer - The buffer data from the uploaded file.
+ * @param {string} mime - The file type of the uploaded file.
+ * @returns {Promise} - A promise that resolves to an array of keywords extracted from the document.
+ * @throws {Error} - Throws an error if failed to extract keywords.
+ */
 async function extractKeywords(buffer, mime) {
     try {
+        //Initiate a container for document text
         let documentText = ''
+
         switch (mime) {
-            //application/pdf or .pdf
-            case allowedFileTypes[0]: {
+            case allowedFileTypes[0]: { // when file type is PDF
                 //Convert pdf buffer to Uint8Array
                 const pdfBuffer = new Uint8Array(buffer);
-                //Initialize keyword array
-                //Read PDF from Buffer
+
+                // Then, uses pdf.js to read PDF from the buffer
                 const pdfDocument = await getDocument({
                     data: pdfBuffer,
                     standardFontDataUrl: standardFontsPath,
                 }).promise;
-                //Initialize pdf text array
-                //LOOP OVER PDF PAGES
-                for (let i = 1; i < pdfDocument.numPages; i++) {
-                    //GET PDF PAGE
-                    const page = await pdfDocument.getPage(i);
-                    //EXTRACT TEXT CONTENT
-                    const pageContent = await page.getTextContent();
 
-                    //CHECK IF PDF PAGE CONTAINS DATA
-                    if (pageContent && pageContent.items && pageContent.items.length > 0) {
-                        //LOOP OVER PDF ITEMS OBJECT
-                        for (let j = 0; j < pageContent.items.length; j++) {
-                            //GET THE ITEM
-                            const item = pageContent.items[j];
-                            //CHECK IF THE ITEM CONTAINS TEXT
-                            if (item.str) {
-                                //ADD TEXT TO PDFTEXT STRING
-                                documentText+= item.str
-                            }
+                //LOOP OVER PDF PAGES: Extracts text content from each page of the document
+                for (let i = 1; i <= pdfDocument.numPages; i++) {
+                    //GET PDF PAGE
+                    const page = await pdfDocument.getPage(i);  // Get text content of the page
+                    const pageContent = await page.getTextContent();
+                    //Iterate over page's items and append the text data of each item to the documentText variable;
+                    //Extracts text content from each item of the document, these items could be text or image or etc..
+                    //Uses 'str' property to get the text.
+                    pageContent.items.forEach(item => {
+                        if (item.str) {
+                            documentText += item.str;
                         }
-                    }
+                    });
                 }
                 break;
             }
-            //application/vnd.openxmlformats-officedocument.wordprocessingml.document or .docx
-            case allowedFileTypes[1]: {
+            case allowedFileTypes[1]: { // when file type is DOCX
+                //Extract text from DOCX format using mammoth.js
                 documentText = (await mammoth.extractRawText({buffer})).value;
                 break;
             }
@@ -74,49 +85,45 @@ async function extractKeywords(buffer, mime) {
             }
         }
 
-        //START AI ASSISTANT LOGIC
+        //After getting text data, use OpenAI to extract keywords
+        //Creates a new chat thread
         const thread = await openai.beta.threads.create();
 
-        //CREATE CHAT
+        //Pushes user role message to the thread, The content of the user message is actual document text
         await openai.beta.threads.messages.create(thread.id, {
             role: "user",
             content: documentText,
         });
 
-        //RUN AI ASSISTANT
+        //Runs the AI assistant
         const run = await openai.beta.threads.runs.create(thread.id, {
             assistant_id: "asst_yJJNA8YwxOdLgWE0brBT5zAy",
         });
 
-        //Check run status
-        let runStatus = await openai.beta.threads.runs.retrieve(
-            thread.id,
-            run.id
-        );
+        //Check for the results (keywords in this case)
+        let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
 
         //Pooling to check if the analysis is done.
         while (runStatus.status !== "completed") {
             await new Promise((resolve) => setTimeout(resolve, 2000));
             runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
         }
+        //When the assistant is done with processing, collect the messages from the thread.
         const messages = await openai.beta.threads.messages.list(thread.id);
 
-        // Find AI Response
+        // Find AI Response (assistant's message)
+        // Gets the last assistant message from the thread, which is supposed to be the list of keywords
         const lastMessage = messages.data
-            .filter(
-                (message) => message.run_id === run.id && message.role === "assistant"
-            )
+            .filter((message) => message.run_id === run.id && message.role === "assistant")
             .pop();
-        if(lastMessage){
-            //Convert into readable javascript array
-            return JSON.parse(new Array(lastMessage.content[0].text.value));
-        }else{
-            return []
-        }
+
+        //Parse the message to a proper object and return it.
+        return lastMessage ? JSON.parse(new Array(lastMessage.content[0].text.value)) : []
 
     } catch (error) {
-        console.error('Error extracting text from PDF:', error);
-        throw error; // Rejeitar o erro para notificar chamadores da função sobre falha.
+        // Log error and throw it further.
+        Logging.error('Error extracting text from PDF:', error);
+        throw error;
     }
 }
 
@@ -148,55 +155,63 @@ function generateSHA256Hash(buffer) {
     return crypto.createHash("sha256").update(buffer).digest('hex')
 }
 
-/**
- * upload a document and handle its processing
- **/
+// function for dividing the main related tasks  into smaller separate functions
 export function uploadDocument(req, res) {
+
+    // Uploads the single document on request
     upload.single('document')(req, res, async (err) => {
+        // error handling
         if (err) {
-            new Error(err)
-            return res.status(400).json({error: err.message});
+            handleError(err, res);
+            return;
         }
 
+        // Calls the following functions to handle document processing and db operations
         try {
-            const session = await getUserSession(req, res)
-            //Parse file values to check if its valid
-            const file = fileSchema.parse(req.file);
-            //Create a unique hash to link to that file
-            const fileHash = generateSHA256Hash(file.buffer)
-            //Store file inside database
+            const session = await getUserSession(req, res);
+            const file = parseFileSchema(req.file);
+            const fileHash = generateSHA256Hash(file.buffer);
+            const document = await saveDocument(file, session.user.userId, fileHash);
 
-            const document = new Document({
-                fieldname: file.fieldname,
-                originalname: file.originalname,
-                encoding: file.encoding,
-                mimetype: file.mimetype,
-                date: Date.now(),
-                buffer: file.buffer,
-                userId: session.user.userId,
-                hash: fileHash,
-            })
-
-            await document.save()
-            res.status(200).json({message: 'File uploaded successfully'});
-
-            //Start keyword indexing after file is uploaded
-            document.keywords = await extractKeywords(file.buffer, file.mimetype)
-            await document.save()
-        } catch (error) {
-            console.error(error);
-            new Error(error)
-            res.status(500).json({error: 'Error parsing file object'});
+            res.status(200).json({message: 'File uploaded and saved successfully'});
+            document.keywords = await extractKeywords(file.buffer, file.mimetype);
+            await document.save();
+        }
+        catch(error) {
+            handleError(error, res);
         }
     });
 }
 
-/**
- * returns all existing documents
- * @constructor
- * @param {Request} req - Context Request
- * @param {Response} res - Context Response
- */
+// Function for error handling - enables us to maintain a DRY principle and reuse in multiple places
+function handleError(error, res) {
+    console.error(error);
+    res.status(500).json({error: 'An internal error occurred while processing the request'});
+    new Error(error);
+}
+
+// Function to parse the file schema - separates the logic for parsing and validating the file schema
+function parseFileSchema(file) {
+    //attempt to parse the file to check if it matches the schema
+    return fileSchema.safeParse(file);
+}
+
+// Function to Save the document in DB
+async function saveDocument(file, userId, fileHash) {
+    const document = new Document({
+        fieldname: file.fieldname,
+        originalname: file.originalname,
+        encoding: file.encoding,
+        mimetype: file.mimetype,
+        date: Date.now(),
+        buffer: file.buffer,
+        userId: userId,
+        hash: fileHash,
+    });
+
+    // Saves the document and returns
+    return await document.save();
+}
 
 export async function getDocuments(req, res) {
     try {
@@ -220,32 +235,6 @@ export async function getDocuments(req, res) {
 
 
 
-/**
- * returns a document based on its ID
- * @constructor
- * @param {Express.Request} req - Context Request
- * @param {Express.Response} res - Context Response
- */
-export function getDocumentById(req, res) {
-    // Implementar lógica para obter um documento por ID
-}
-
-/**
- * Updates a existing document based on its ID
- * @constructor
- * @param {Express.Request} req - Context Request
- * @param {Express.Response} res - Context Response
- */
-export function updateDocument(req, res) {
-    // Implementar lógica para atualizar um documento
-}
-
-/**
- * Deletes a document based on its hash
- * @constructor
- * @param {Request} req - Context Request
- * @param {Response} res - Context Response
- */
 export async function deleteDocument(req, res) {
     try {
         const result = await getUserSession(req, res);

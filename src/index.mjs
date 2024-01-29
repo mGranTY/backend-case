@@ -1,67 +1,60 @@
-//Server framework
+// Import server framework.
 import express from 'express';
-// MONGODB ODM
+// Import MongoDB ODM (Object Data Modeling) library.
 import mongoose from "mongoose";
-// ENV BUT TYPE SAFE AND RUNTIME CHECKED
+// Import run-time type checked configuration file.
 import {CONFIG} from "./configs/envConfig.mjs";
-//cors middleware
+// Import CORS (Cross-Origin Resource Sharing) middleware.
 import cors from 'cors'
-// LOGGER UTIL
+// Import logger utility.
 import Logging, {LoggerMiddleware} from "./utils/logger.mjs";
-//error handler middleware
+// Import error handler middleware.
 import {ErrorHandler} from "./helpers/errorHandler.mjs";
-//Auth Middleware, all routes below it will need authentication
+// Import authentication middleware. All routes below it will require authentication.
 import {AuthMiddleware} from "./utils/lucia.mjs";
-//ROUTES
+// Import routes.
 import {documentRouter} from "./routes/documentRouter.mjs";
 import {authRouter} from "./routes/authRouter.mjs";
 
+// Initialize express app.
+const app = express();
 
-const app = express()
-
-
-//Native JSON body parser
+// Use JSON body parser provided natively by Express.
 app.use(express.json())
 app.use(express.urlencoded({extended: true}));
 
-
-//Cors Handler
-// @TODO: ADD PROPER ORIGIN
+// Configure CORS (Cross-Origin Resource Sharing).
 app.use(cors({
     origin: '*',
     methods: "GET,PUT,POST,DELETE",
     preflightContinue: true,
     optionsSuccessStatus: 204,
-}))
-app.options('*', cors())
+}));
+app.options('*', cors());
 
-
-//Request Logger
+// Use log request middleware.
 app.use(LoggerMiddleware)
 
-//Auth Router | All Account related endpoints
-app.use(authRouter)
+// Use the authentication Router for all account related endpoints.
+app.use(authRouter);
 
+// Protect all routes using the auth middleware. It requires the user to have a valid session.
+app.use(AuthMiddleware);
+// Use Document Router for all document endpoints.
+app.use(documentRouter);
 
-//All routes are protected by the auth middleware, it requires the user to have a valid session
-app.use(AuthMiddleware)
-//All Document endpoints
-app.use(documentRouter)
-
-
-
-//Error handlers
-//page not found error Handler
+// Use error handling middlewares.
+// Handler for page not found errors (404).
 app.use((req, res, next) => {
     const err = new Error('Page Not Found');
     err.code = 404;
     next(err);
 });
 
-//General error handler
-app.use(ErrorHandler)
+// Use general error handler.
+app.use(ErrorHandler);
 
-//Start server
+// Function to start server.
 function startServer() {
     mongoose
         .connect(CONFIG.MONGODB_URI, {
@@ -69,14 +62,18 @@ function startServer() {
             writeConcern: {w: 'majority'},
         })
         .then(() => {
+            // Log successful MongoDB connection.
             Logging.info('Connected to MongoDB');
+            // Start server and log port the server is running on.
             app.listen(CONFIG.PORT, () => {
                 Logging.info(`Server running on port ${CONFIG.PORT}`)
             })
         })
         .catch((error) => {
+            // Log error if connection to MongoDB fails.
             Logging.error(error);
         });
 }
 
-startServer()
+// Start the server.
+startServer();
