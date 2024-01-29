@@ -4,7 +4,7 @@ import Logging from "../utils/logger.mjs"; // Import logging module
 import {z} from "zod"; // Import zod for schema validation
 
 // Schemas for account creation and login
-const AccountSchema = z.object({
+export const AccountSchema = z.object({
     email: z.string().email(),
     password: z.string().min(6).max(32),
 });
@@ -26,9 +26,11 @@ export async function createAccount(req, res){
         });
 
         res.status(200).json({message: "Account created!", success: true});
+        return {message: "Account created!", success: true}
     } catch (e) {
         Logging.error(e); // Log the error
         res.status(500).json({message: e.message, success: false});
+        return {message: e.message, success: false}
     }
 }
 
