@@ -1,4 +1,10 @@
 name: CI
+
+env:
+  PORT: 3000
+  OPEN_AI_API_KEY: "hi"
+  MONGODB_URI: "mongodb://"
+
 on:
   push:
     branches:
