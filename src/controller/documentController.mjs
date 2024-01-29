@@ -235,48 +235,75 @@ export async function getDocuments(req, res) {
 
 
 
+// This function handles the deletion of a document
 export async function deleteDocument(req, res) {
+    // Try block to handle any potential errors
     try {
+        // Retrieve user session details
         const result = await getUserSession(req, res);
+        // Retrieve the required document hash from the request parameters
         const hash = String(req.params.hash);
 
+        // Conditional to check if there is a result and a hash provided
         if (result && hash) {
+            // Retrieve a non-trashed document from MongoDB that belongs to the current user
             const doc = await Document.findOne({ userId: result.user.userId, trashed: false, hash });
 
+            // Conditional to check if the document exists
             if (doc) {
+                // Flag the document as having been trashed
                 doc.trashed = true;
+                // Save the changes to the document
                 await doc.save();
+                // Return a response to the client indicating the successful deletion of the document
                 res.status(200).json({ doc, success: true });
             } else {
+                // Return a response to the client indicating that the document was not found
                 res.status(404).json({ success: false, message: "Document not found" });
             }
         } else {
+            // Return a response to the client indicating that the request parameters were invalid
             res.status(400).json({ success: false, message: "Invalid request parameters" });
         }
     } catch (error) {
+        // Log any errors
         Logging.error(error);
+        // Return a response to the client indicating that there was an internal server error
         res.status(500).json({ success: false, message: "Internal Server Error" });
     }
 }
 
+// @@DEPRECATED
+// This function handles the searching of documents.
 export async function searchDocument(req, res) {
+    // Try block to handle any errors.
     try {
+        // Retrieve user session details.
         const result = await getUserSession(req, res);
+        // Retrieve the search parameters from the request parameters.
         const searchParams = String(req.params.search);
 
-        if (result && search) {
-            const docs = await Document.find({ userId: result.user.userId, trashed: false, $text: { search: searchParams } });
+        // Check if there is a result and a search string provided.
+        if (result && searchParams) {
+            // Use MongoDB's $text operator to perform a text search on the documents that belong to the user.
+            const docs = await Document.find({ userId: result.user.userId, trashed: false, $text: { $search: searchParams } });
 
+            // Check if any documents were found.
             if (docs) {
+                // Return a response to the client containing the found documents.
                 res.status(200).json({ docs, success: true });
             } else {
+                // Return a response to the client indicating that no documents were found.
                 res.status(404).json({ success: false, message: "Document not found" });
             }
         } else {
+            // Return a response to the client indicating that the request parameters were invalid.
             res.status(400).json({ success: false, message: "Invalid request parameters" });
         }
     } catch (error) {
+        // Log any errors.
         Logging.error(error);
+        // Return a response to the client indicating that there was an internal server error.
         res.status(500).json({ success: false, message: "Internal Server Error" });
     }
 }
