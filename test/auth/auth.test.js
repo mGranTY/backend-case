@@ -1,5 +1,5 @@
 import {createAccount, login} from "../../src/controller/authController.js";
-import {beforeAll, describe, expect, test, vi} from "vitest";
+import {beforeAll , afterAll, describe, expect, test, vi} from "vitest";
 import {MongoMemoryServer} from "mongodb-memory-server";
 import mongoose from "mongoose";
 
@@ -158,3 +158,7 @@ describe('login', () => {
     })
 
 });
+
+afterAll(async () => {
+    await mongoose.disconnect();
+})
